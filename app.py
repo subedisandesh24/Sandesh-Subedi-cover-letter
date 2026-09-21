@@ -48,7 +48,7 @@ def setup_calibri_fonts():
 
 
 # -------------------------------------------------------------------------
-# 2. Clean Text Function (Removes '???' and raw markdown artifacts)
+# 2. Clean Text Function
 # -------------------------------------------------------------------------
 def clean_text(val):
     """Safely converts unicode to clean ASCII, stripping characters that turn into '???' and removes stray asterisks"""
@@ -77,7 +77,65 @@ def clean_text(val):
 
 
 # -------------------------------------------------------------------------
-# 3. PDF Builder (Calibri Typography & Clean Layout)
+# 3. Dedicated Fallback Generators (Prevents Blank Cover Letter & Email)
+# -------------------------------------------------------------------------
+def get_fallback_cover_letter(target_role, org_name, date_str):
+    return f"""{date_str}
+
+Hiring Committee
+{org_name}
+
+Subject: Application for the position of {target_role}
+
+Dear Hiring Committee,
+
+I am writing to express my enthusiastic interest in the {target_role} position at {org_name}. As an agriculture professional with an ongoing Master of Science in Agriculture (Horticulture) at Agriculture and Forestry University (AFU) and a Bachelor of Science in Agriculture (78.3%, Merit Scholarship) from Tribhuvan University (IAAS), I bring hands-on experience in agricultural training, rural enterprise facilitation, varietal research, and digital data collection. My background aligns closely with {org_name}'s mission to advance sustainable rural livelihoods, food security, and resilient agrifood systems across Nepal.
+
+Throughout my career, I have demonstrated the ability to bridge field research with grassroots community action. As Province Assistant for Daayitwa NGO under the Growth Entrepreneurship and Employment Promotion (GEEP) program, I supported rural enterprise development across Jaljala, Hupsekot, Badigad, Siranchok, and Myagde rural municipalities. Working collaboratively with municipal authorities, local entrepreneurs, and community leaders, I facilitated stakeholder consultations and field monitoring that created sustainable economic opportunities for local households.
+
+Furthermore, as Agriculture Instructor and focal point for the JICA Partnership Program at Shree Mahendra Secondary School in Kaski, I supervised the practical 'Learn & Earn' program. I guided learners and youth groups through the complete crop production cycle—from seedbed preparation and nursery management to harvesting, post-harvest processing, and local market linkages. My practical facilitation skills are further evidenced by my training delivery with the Stromme Foundation and Harihar Women Savings and Loan Cooperative, where I conducted hands-on sessions on off-season vegetable farming, integrated pest management (IPM), and mushroom cultivation.
+
+In addition to field facilitation, I bring solid research and analytical capabilities. At the Nepal Agricultural Research Council (NARC) Horticulture Research Station in Malepatan, I guided Junior Technical Assistants (JTAs) on field agronomy trials, supervised varietal performance experiments, and contributed to technical reporting. As an enumerator for the National Census of Agriculture 2021/22, I conducted rigorous household surveys using digital tools and participatory techniques (KIIs and FGDs). With multiple peer-reviewed publications and technical proficiency in Arc-GIS, RStudio, SPSS, and Python-based crop analytics, I am well-prepared to support program MEAL, data-driven planning, and impact documentation.
+
+I am eager to contribute my field experience, technical training skills, and dedication to {org_name}'s development interventions. I strictly uphold organizational safeguarding standards, gender equality and social inclusion (GESI), and humanitarian values. I welcome the opportunity to discuss how my competencies align with your program goals.
+
+Sincerely,
+
+Sandesh Subedi
+Phone: +977-9866009867
+Email: Subedisandesh24@gmail.com
+Putalibazar-13, Syangja / Nepal"""
+
+
+def get_fallback_email(target_role, org_name):
+    return f"""Dear Hiring Team,
+
+I hope this email finds you well.
+
+I am writing to formally submit my application for the position of {target_role} at {org_name}.
+
+With an ongoing Master of Science in Agriculture (Horticulture) at Agriculture and Forestry University (AFU) and a Bachelor of Science in Agriculture (78.3%) from Tribhuvan University, I bring proven field experience in rural enterprise promotion (Daayitwa GEEP program), participatory farmer training (Stromme Foundation, Harihar Cooperative), JICA program coordination, and agronomic research trials with NARC. I am confident in my capacity to contribute effectively to your field implementation and program outcomes.
+
+Please find attached the following documents for your review:
+1. Curriculum Vitae (CV)
+2. Cover Letter
+3. Academic Transcripts and Certificates (B.Sc. Agriculture, IAAS TU)
+4. Copy of Nepali Citizenship Certificate (Nagarikta)
+5. Relevant Training & Experience Credentials
+
+Thank you for your time and consideration. I look forward to hearing from you regarding the next steps in the recruitment process.
+
+Sincerely,
+
+Sandesh Subedi
+Phone: +977-9866009867
+Email: Subedisandesh24@gmail.com
+LinkedIn: linkedin.com/in/sandeshsubedi24
+Putalibazar-13, Syangja, Nepal"""
+
+
+# -------------------------------------------------------------------------
+# 4. PDF Builder (Calibri Typography & Justified Responsibilities)
 # -------------------------------------------------------------------------
 class CompleteCVPDF(FPDF):
     def __init__(self, doc_type="CV"):
@@ -164,7 +222,8 @@ class CompleteCVPDF(FPDF):
         self.set_text_color(35, 35, 35)
         for bullet in bullets:
             self.set_x(self.l_margin)
-            self.multi_cell(avail_w, 4.3, f"-  {clean_text(bullet)}", new_x="LMARGIN", new_y="NEXT")
+            # Major work responsibilities rendered with Justified Alignment ('J')
+            self.multi_cell(avail_w, 4.3, f"-  {clean_text(bullet)}", align="J", new_x="LMARGIN", new_y="NEXT")
         self.ln(1.5)
 
     def draw_two_col_entry(self, left_bold, left_sub, right_txt, right_sub=""):
@@ -198,18 +257,18 @@ class CompleteCVPDF(FPDF):
 
 
 # -------------------------------------------------------------------------
-# 4. Dynamic Model Selector
+# 5. Dynamic Model Selector
 # -------------------------------------------------------------------------
 def get_groq_active_models(client):
     try:
         available_models = [m.id for m in client.models.list().data]
         preferred_text = [
-            "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b",
-            "llama-3.3-70b-versatile", "llama-3.1-8b-instant"
+            "llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b", "llama-3.1-8b-instant"
         ]
         text_model = next((m for m in preferred_text if m in available_models), None)
         if not text_model:
-            text_model = available_models[0] if available_models else "openai/gpt-oss-120b"
+            text_model = available_models[0] if available_models else "llama-3.3-70b-versatile"
 
         preferred_vision = [
             "llama-3.2-11b-vision-preview", "llama-3.2-90b-vision-preview", "qwen/qwen3.8-27b"
@@ -217,11 +276,11 @@ def get_groq_active_models(client):
         vision_model = next((m for m in preferred_vision if m in available_models), text_model)
         return text_model, vision_model
     except Exception:
-        return "openai/gpt-oss-120b", "llama-3.2-11b-vision-preview"
+        return "llama-3.3-70b-versatile", "llama-3.2-11b-vision-preview"
 
 
 # -------------------------------------------------------------------------
-# 5. Permanent CV Database (Sandesh Subedi)
+# 6. Permanent CV Database (Sandesh Subedi)
 # -------------------------------------------------------------------------
 PERMANENT_CV_SECTIONS = {
     "education": [
@@ -309,7 +368,7 @@ PERMANENT_CV_SECTIONS = {
 }
 
 # -------------------------------------------------------------------------
-# 6. Streamlit Progressive Workflow State
+# 7. Streamlit Progressive Workflow State
 # -------------------------------------------------------------------------
 st.set_page_config(page_title="Sandesh Subedi - Application Matcher", layout="wide")
 
@@ -444,14 +503,13 @@ if st.session_state.scanned_data:
     if target_role:
         st.write("")
         if st.button(f"🚀 Generate Application for '{target_role}'", type="primary"):
-            with st.spinner(f"Crafting evidence-based application for Sandesh Subedi in Calibri typography..."):
+            with st.spinner("Crafting complete evidence-based application for Sandesh Subedi in Calibri typography..."):
                 try:
                     client = Groq(api_key=api_key)
                     text_model, vision_model = get_groq_active_models(client)
 
                     today_formatted = datetime.today().strftime("%B %d, %Y")
 
-                    # In-depth Recruitment Excellence Prompt tailored for Sandesh Subedi
                     full_prompt = f"""
                     You are a senior recruitment director and technical advisor for international and national NGOs in Nepal (UN agencies, FAO, WFP, USAID, FCDO, CARE, Save the Children, WWF, Plan International, Heifer).
 
@@ -462,10 +520,9 @@ if st.session_state.scanned_data:
 
                     CRITICAL CANDIDATE PROFILE & EVIDENCE BASE:
                     - Degree: Bachelor of Science in Agriculture (B.Sc. Agriculture) from IAAS Tribhuvan University, Lamjung (Percentage: 78.3%, Merit Scholarship, Best Presentator Award). Ongoing Master of Science in Agriculture (M.Sc. Ag Horticulture, Agriculture and Forestry University AFU Chitwan, 2025-Present, thesis combining AI & manual data collection on tomato yield).
-                    - STRICT FACT: DO NOT fabricate any degree. He is an agricultural specialist in Horticulture, Value Chains, and Livelihoods.
                     - Verified Track Record:
                       1. Stromme Foundation (Chitwan, Nov-Jan):
-                         Trainer: Designed and delivered participatory agricultural training covering nursery and soil management, horticulture, mushroom cultivation, apiculture, sericulture, post-harvest handling, agricultural marketing, and rural enterprise development.
+                         Trainer: Hands-on participatory agricultural training covering nursery and soil management, horticulture, mushroom cultivation, apiculture, sericulture, post-harvest handling, agricultural marketing, and rural enterprise development.
                       2. Daayitwa NGO (Kaski, March-May):
                          Province Assistant: Growth Entrepreneurship and Employment Promotion (GEEP) program across Jaljala, Hupsekot, Badigad, Siranchok, and Myagde rural municipalities; enterprise development, grassroots stakeholder & local government coordination, field-level monitoring & documentation.
                       3. Shree Mahendra Secondary School (Bhalam, Kaski, Jan 2024-Dec 2024):
@@ -479,53 +536,38 @@ if st.session_state.scanned_data:
                     ========================================================================
                     SECTION A: IN-DEPTH, EVIDENCE-BASED COVER LETTER (~1 TO 1.2 PAGES)
                     ========================================================================
-                    - Tone: Professional, confident, sincere, human, development-oriented, and practical. Avoid generic corporate fluff.
-                    - Evidence-Based: SHOW real field achievements (e.g., GEEP enterprise promotion across 5 rural municipalities, JICA program focal point, NARC research trials, National Census of Agriculture enumerator, training smallholder farmers and youth).
-                    - Natural INGO Terminology: Weave in relevant development terms based on the JD: food systems, value chain development, climate-resilient horticulture, GESI, enterprise development, participatory training, MEAL, safeguarding.
+                    - Tone: Professional, confident, sincere, human, development-oriented, and practical.
+                    - Evidence-Based: SHOW real field achievements (GEEP enterprise promotion in 5 rural municipalities, JICA focal point, Learn & Earn, NARC trials, National Agriculture Census).
                     - 5-Paragraph Structure:
-                      * Paragraph 1 (Opening): Exact position, organization, clear professional identity (Agriculture & Horticulture Specialist with proven background in rural enterprise, community mobilization, agricultural research, and value chain development), and specific alignment with project outcomes.
+                      * Paragraph 1 (Opening): Exact position, organization, professional identity (Agriculture & Horticulture Specialist with proven background in rural enterprise, community mobilization, agricultural research, and value chain development), and specific alignment with project outcomes.
                       * Paragraph 2 (Enterprise & Program Coordination): Concrete achievements from Daayitwa NGO (GEEP program in 5 rural municipalities) and JICA focal point / Learn & Earn Program at Shree Mahendra School.
                       * Paragraph 3 (Training & Smallholder Empowerment): Practical grassroots training delivered with Stromme Foundation and Harihar Women Cooperative, emphasizing hands-on IPM, nursery management, and market linkages.
                       * Paragraph 4 (Research, Data & Technical Rigor): Solid analytical grounding from NARC Horticulture Research Station, National Agriculture Census, Arc-GIS, RStudio, and AI/smart agriculture research.
                       * Paragraph 5 (Closing): Concrete contribution, safeguarding commitment, humanitarian values, availability, and formal sign-off.
-                    - Date Mandate: Start strictly with: "{today_formatted}\\n\\nHiring Committee\\n{org_name}\\n..."
-                    - Closing: Formally end with:
+                    - Mandatory Opening: Start strictly with: "{today_formatted}\\n\\nHiring Committee\\n{org_name}\\n..."
+                    - Mandatory Sign-off: Formally end with:
                       "Sincerely,\\nSandesh Subedi\\nPhone: +977-9866009867\\nEmail: Subedisandesh24@gmail.com\\nPutalibazar-13, Syangja / Nepal"
 
                     ========================================================================
                     SECTION B: INGO-TAILORED CV
                     ========================================================================
-                    1. Professional Identity Tagline:
-                       A strong, scannable headline matching the vacancy, e.g.:
-                       "Horticulture & Livelihoods Specialist | Value Chain Development | Rural Enterprise | Climate Resilience | MEAL"
-                    2. Tailored Professional Summary:
-                       3-4 impactful lines answering: Who are you? What sectors do you work in? What stakeholders have you engaged? What development outcomes do you deliver?
-                    3. Core Competencies Matrix:
-                       8-12 prioritized competencies directly aligned to the JD (e.g., Climate-Resilient Horticulture, Agricultural Enterprise & Value Chains, Community Mobilization & GESI, Training & Facilitation (ToT), Field Trials & Agronomic Research, Survey Design & MEAL, Stakeholder Coordination, Digital Agriculture & GIS).
-                    4. Professional Experience (Action + What + Who/Where + Result):
-                       Provide 4-5 substantive, action-packed bullet points for each of the authentic organizations. Keep genuine context (Jaljala, Hupsekot, Badigad, Siranchok, Myagde, JICA partnership program, NARC varietal trials, National Agriculture Census). DO NOT invent fictional employers.
+                    - Tagline: Strong scannable headline matching the vacancy.
+                    - Summary: 3-4 impactful lines answering who you are, sectors, stakeholders, and outcomes.
+                    - Competencies: 8-12 prioritized competencies directly aligned to the JD.
+                    - Tailored Experience: 4-5 substantive bullet points for each of the 5 authentic organizations.
 
                     ========================================================================
                     SECTION C: ADMINISTRATIVE GMAIL APPLICATION MESSAGE
                     ========================================================================
-                    - Brief, formal, clear, and administrative email body.
+                    - Formal, clear, and administrative email body.
                     - Clearly state position and vacancy source.
-                    - 1-2 sentence suitability statement highlighting B.Sc. Agriculture (Horticulture/Enterprise experience) and ongoing M.Sc.
-                    - Clear checklist of attached documents:
-                      1. Curriculum Vitae (CV)
-                      2. Cover Letter
-                      3. Academic Transcripts and Certificates (B.Sc. Ag, IAAS TU)
-                      4. Copy of Nepali Citizenship Certificate (Nagarikta)
-                      5. Relevant Training & Experience Certificates
+                    - 1-2 sentence suitability statement highlighting B.Sc. Ag (Horticulture/Enterprise experience) and ongoing M.Sc.
+                    - Checklist of attached documents (CV, Cover Letter, Transcripts, Nagarikta, Certificates).
 
-                    NO ASTERISKS RULE: Do NOT use markdown asterisks (* or **) in any JSON string. Write clean, formal, standard English text.
+                    CRITICAL INSTRUCTION: You MUST fill all JSON fields completely. DO NOT leave cover_letter or email_body empty or abbreviated.
 
-                    Return valid JSON only matching this exact schema:
+                    Return valid JSON only matching this schema:
                     {{
-                        "vacancy_details": {{
-                            "job_title": "{target_role}",
-                            "organization": "{org_name}"
-                        }},
                         "cv_professional_tagline": "Horticulture & Livelihoods Specialist | Value Chain Development | Rural Enterprise | MEAL",
                         "cv_professional_summary": "3-4 lines tailored professional summary...",
                         "cv_core_competencies": ["Competency 1", "Competency 2", "Competency 3", "Competency 4", "Competency 5", "Competency 6", "Competency 7", "Competency 8"],
@@ -566,9 +608,9 @@ if st.session_state.scanned_data:
                                 "bullets": ["Detailed action-result bullet 1", "Detailed action-result bullet 2", "Detailed action-result bullet 3"]
                             }}
                         ],
-                        "cover_letter": "{today_formatted}\\n\\nHiring Committee\\n{org_name}... (5 substantive evidence-based paragraphs, ending with Sandesh Subedi's contact info)",
+                        "cover_letter": "{today_formatted}\\n\\nHiring Committee\\n{org_name}... (complete 5 substantive paragraphs)",
                         "email_subject": "Application for {target_role} - Sandesh Subedi",
-                        "email_body": "Formal Gmail body text with attached documents checklist and contact details..."
+                        "email_body": "Formal Gmail body text with checklist and contact details..."
                     }}
                     """
 
@@ -596,16 +638,41 @@ if st.session_state.scanned_data:
                         model=exec_model,
                         messages=exec_msgs,
                         response_format={"type": "json_object"},
+                        max_tokens=4096,
                         temperature=0.2
                     )
                     data = json.loads(resp.choices[0].message.content.strip())
 
-                    # Post-process Cover Letter Date & replace placeholders
-                    raw_cl = clean_text(data.get("cover_letter", ""))
+                    # Safe extraction for Cover Letter (guaranteed not blank)
+                    cover_letter_val = ""
+                    for k in ["cover_letter", "coverLetter", "letter", "application_letter", "cover_letter_body"]:
+                        if data.get(k) and str(data[k]).strip():
+                            cover_letter_val = str(data[k]).strip()
+                            break
+
+                    if not cover_letter_val or len(cover_letter_val) < 80:
+                        cover_letter_val = get_fallback_cover_letter(target_role, org_name, today_formatted)
+
+                    # Post-process Cover Letter Date
+                    raw_cl = clean_text(cover_letter_val)
                     raw_cl = re.sub(r'\[\s*Date\s*\]', today_formatted, raw_cl, flags=re.IGNORECASE)
                     if not raw_cl.startswith(today_formatted):
                         raw_cl = f"{today_formatted}\n\n" + raw_cl
                     data["cover_letter"] = raw_cl
+
+                    # Safe extraction for Email Subject & Body (guaranteed not blank)
+                    email_body_val = ""
+                    for k in ["email_body", "emailBody", "email", "email_text", "email_content", "body"]:
+                        if data.get(k) and str(data[k]).strip():
+                            email_body_val = str(data[k]).strip()
+                            break
+
+                    if not email_body_val or len(email_body_val) < 40:
+                        email_body_val = get_fallback_email(target_role, org_name)
+                    data["email_body"] = clean_text(email_body_val)
+
+                    email_sub_val = data.get("email_subject") or data.get("emailSubject") or f"Application for {target_role} - Sandesh Subedi"
+                    data["email_subject"] = clean_text(email_sub_val)
 
                     avail_w = 210 - 16 - 16
 
@@ -624,12 +691,12 @@ if st.session_state.scanned_data:
                     cv_pdf.cell(avail_w, 5, tagline, new_x="LMARGIN", new_y="NEXT")
                     cv_pdf.ln(1)
 
-                    # 2. Tailored Professional Summary
+                    # 2. Tailored Professional Summary (Justified)
                     summary_text = clean_text(data.get("cv_professional_summary", ""))
                     cv_pdf.set_x(cv_pdf.l_margin)
                     cv_pdf.set_font(cv_pdf.font_family, "", 9.2)
                     cv_pdf.set_text_color(30, 30, 30)
-                    cv_pdf.multi_cell(avail_w, 4.3, summary_text, new_x="LMARGIN", new_y="NEXT")
+                    cv_pdf.multi_cell(avail_w, 4.3, summary_text, align="J", new_x="LMARGIN", new_y="NEXT")
                     cv_pdf.ln(1.5)
 
                     # 3. Core Competencies Matrix
@@ -650,7 +717,7 @@ if st.session_state.scanned_data:
                                 cv_pdf.ln(4.2)
                         cv_pdf.ln(1)
 
-                    # 4. Professional Experience
+                    # 4. Professional Experience (Responsibilities with Justified Alignment)
                     cv_pdf.draw_section_heading("Professional Experience")
                     for org in data.get("tailored_experience", []):
                         raw_bullets = org.get("bullets", [])
@@ -671,10 +738,10 @@ if st.session_state.scanned_data:
                             cv_pdf.set_x(cv_pdf.l_margin)
                             cv_pdf.set_font(cv_pdf.font_family, "I", 8.8)
                             cv_pdf.set_text_color(60, 60, 60)
-                            cv_pdf.multi_cell(avail_w, 3.8, f"  * {clean_text(edu['sub'])}", new_x="LMARGIN", new_y="NEXT")
+                            cv_pdf.multi_cell(avail_w, 3.8, f"  * {clean_text(edu['sub'])}", align="J", new_x="LMARGIN", new_y="NEXT")
                             cv_pdf.ln(0.5)
 
-                    # 6. Publications (Peer-Reviewed)
+                    # 6. Publications (Peer-Reviewed with Clickable DOIs)
                     cv_pdf.draw_section_heading("Peer-Reviewed Publications")
                     cv_pdf.set_font(cv_pdf.font_family, "", 8.8)
                     for pub in PERMANENT_CV_SECTIONS["publications"]:
@@ -742,7 +809,7 @@ if st.session_state.scanned_data:
                     cv_pdf.output(cv_buf)
 
                     # ---------------------------------------------------------
-                    # BUILD EVIDENCE-BASED COVER LETTER PDF (1 to 1.2 Pages)
+                    # BUILD EVIDENCE-BASED COVER LETTER PDF (Justified Alignment)
                     # ---------------------------------------------------------
                     cl_pdf = CompleteCVPDF(doc_type="Cover Letter")
                     cl_pdf.add_page()
@@ -752,7 +819,7 @@ if st.session_state.scanned_data:
                     cl_pdf.set_x(cl_pdf.l_margin)
                     cl_pdf.set_font(cl_pdf.font_family, "", 9.5)
                     cl_pdf.set_text_color(30, 30, 30)
-                    cl_pdf.multi_cell(avail_w, 4.7, clean_text(data.get("cover_letter", "")), new_x="LMARGIN", new_y="NEXT")
+                    cl_pdf.multi_cell(avail_w, 4.7, clean_text(data["cover_letter"]), align="J", new_x="LMARGIN", new_y="NEXT")
 
                     cl_buf = io.BytesIO()
                     cl_pdf.output(cl_buf)
@@ -779,7 +846,9 @@ if st.session_state.generated_app_data is not None:
 
     with tab_cv:
         st.markdown(f"### {clean_text(data.get('cv_professional_tagline', ''))}")
-        st.write(clean_text(data.get("cv_professional_summary", "")))
+        
+        summary_txt = clean_text(data.get("cv_professional_summary", ""))
+        st.markdown(f"<div style='text-align: justify; line-height: 1.6; margin-bottom: 15px;'>{summary_txt}</div>", unsafe_allow_html=True)
 
         st.markdown("#### Core Competencies")
         comps = data.get("cv_core_competencies", [])
@@ -792,7 +861,8 @@ if st.session_state.generated_app_data is not None:
         for org in data.get("tailored_experience", []):
             with st.expander(f"📍 {clean_text(org.get('organization', ''))} - {clean_text(org.get('role', ''))}", expanded=True):
                 for b in org.get("bullets", []):
-                    st.write(f"- {clean_text(b)}")
+                    # Web preview of work responsibilities displayed with Justified Alignment
+                    st.markdown(f"<div style='text-align: justify; margin-bottom: 6px;'>• {clean_text(b)}</div>", unsafe_allow_html=True)
 
         # Download button placed at the end of the CV tab
         st.write("")
@@ -806,7 +876,8 @@ if st.session_state.generated_app_data is not None:
 
     with tab_cl:
         st.subheader("Cover Letter (Evidence-Based & JD Aligned)")
-        st.text_area("Cover Letter Preview:", value=clean_text(data.get("cover_letter", "")), height=460, key="cl_preview_area")
+        cl_display_text = clean_text(data.get("cover_letter", ""))
+        st.text_area("Cover Letter Text (Editable):", value=cl_display_text, height=460, key="cl_preview_area")
 
         # Download button placed at the end of the Cover Letter tab
         st.write("")
