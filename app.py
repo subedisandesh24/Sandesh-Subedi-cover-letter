@@ -77,7 +77,7 @@ def clean_text(val):
 
 
 # -------------------------------------------------------------------------
-# 3. Dedicated Fallback Generators (Prevents Blank Cover Letter & Email)
+# 3. Dynamic Fallback Generators (Zero Percentage, Strictly Requested Docs)
 # -------------------------------------------------------------------------
 def get_fallback_cover_letter(target_role, org_name, date_str):
     return f"""{date_str}
@@ -89,7 +89,7 @@ Subject: Application for the position of {target_role}
 
 Dear Hiring Committee,
 
-I am writing to express my enthusiastic interest in the {target_role} position at {org_name}. As an agriculture professional with an ongoing Master of Science in Agriculture (Horticulture) at Agriculture and Forestry University (AFU) and a Bachelor of Science in Agriculture (78.3%, Merit Scholarship) from Tribhuvan University (IAAS), I bring hands-on experience in agricultural training, rural enterprise facilitation, varietal research, and digital data collection. My background aligns closely with {org_name}'s mission to advance sustainable rural livelihoods, food security, and resilient agrifood systems across Nepal.
+I am writing to express my enthusiastic interest in the {target_role} position at {org_name}. As an agriculture professional with an ongoing Master of Science in Agriculture (Horticulture) at Agriculture and Forestry University (AFU) and a Bachelor of Science in Agriculture (Merit Scholarship) from Tribhuvan University, Institute of Agriculture and Animal Sciences (IAAS), I bring hands-on experience in agricultural training, rural enterprise facilitation, varietal research, and digital data collection. My background aligns closely with {org_name}'s mission to advance sustainable rural livelihoods, food security, and resilient agrifood systems across Nepal.
 
 Throughout my career, I have demonstrated the ability to bridge field research with grassroots community action. As Province Assistant for Daayitwa NGO under the Growth Entrepreneurship and Employment Promotion (GEEP) program, I supported rural enterprise development across Jaljala, Hupsekot, Badigad, Siranchok, and Myagde rural municipalities. Working collaboratively with municipal authorities, local entrepreneurs, and community leaders, I facilitated stakeholder consultations and field monitoring that created sustainable economic opportunities for local households.
 
@@ -107,21 +107,27 @@ Email: Subedisandesh24@gmail.com
 Putalibazar-13, Syangja / Nepal"""
 
 
-def get_fallback_email(target_role, org_name):
+def get_fallback_email(target_role, org_name, requested_docs=None):
+    if not requested_docs or len(requested_docs) == 0:
+        docs_list = [
+            "1. Updated Curriculum Vitae (CV)",
+            "2. Cover Letter"
+        ]
+    else:
+        docs_list = [f"{i+1}. {doc}" for i, doc in enumerate(requested_docs)]
+
+    docs_block = "\n".join(docs_list)
+
     return f"""Dear Hiring Team,
 
 I hope this email finds you well.
 
 I am writing to formally submit my application for the position of {target_role} at {org_name}.
 
-With an ongoing Master of Science in Agriculture (Horticulture) at Agriculture and Forestry University (AFU) and a Bachelor of Science in Agriculture (78.3%) from Tribhuvan University, I bring proven field experience in rural enterprise promotion (Daayitwa GEEP program), participatory farmer training (Stromme Foundation, Harihar Cooperative), JICA program coordination, and agronomic research trials with NARC. I am confident in my capacity to contribute effectively to your field implementation and program outcomes.
+With an ongoing Master of Science in Agriculture (Horticulture) at Agriculture and Forestry University (AFU) and a Bachelor of Science in Agriculture from Tribhuvan University, I bring proven field experience in rural enterprise promotion (Daayitwa GEEP program), participatory farmer training (Stromme Foundation, Harihar Cooperative), JICA program coordination, and agronomic research trials with NARC. I am confident in my capacity to contribute effectively to your field implementation and program outcomes.
 
-Please find attached the following documents for your review:
-1. Curriculum Vitae (CV)
-2. Cover Letter
-3. Academic Transcripts and Certificates (B.Sc. Agriculture, IAAS TU)
-4. Copy of Nepali Citizenship Certificate (Nagarikta)
-5. Relevant Training & Experience Credentials
+Please find attached the requested documents for your review:
+{docs_block}
 
 Thank you for your time and consideration. I look forward to hearing from you regarding the next steps in the recruitment process.
 
@@ -222,7 +228,7 @@ class CompleteCVPDF(FPDF):
         self.set_text_color(35, 35, 35)
         for bullet in bullets:
             self.set_x(self.l_margin)
-            # Major work responsibilities rendered with Justified Alignment ('J')
+            # Responsibilities rendered with Justified Alignment ('J')
             self.multi_cell(avail_w, 4.3, f"-  {clean_text(bullet)}", align="J", new_x="LMARGIN", new_y="NEXT")
         self.ln(1.5)
 
@@ -280,7 +286,7 @@ def get_groq_active_models(client):
 
 
 # -------------------------------------------------------------------------
-# 6. Permanent CV Database (Sandesh Subedi)
+# 6. Permanent CV Database (No Percentage Included)
 # -------------------------------------------------------------------------
 PERMANENT_CV_SECTIONS = {
     "education": [
@@ -293,7 +299,7 @@ PERMANENT_CV_SECTIONS = {
         },
         {
             "inst": "Tribhuvan University, Institute of Agriculture and Animal Sciences",
-            "deg": "Bachelors of Science in Agriculture - Percentage: 78.3% (Merit Scholarship)",
+            "deg": "Bachelors of Science in Agriculture (Merit Scholarship)",
             "loc": "Lamjung, Nepal",
             "yr": "2019-2023",
             "sub": "Thesis: Effect of Mulching Materials on Growth and Yield of Brinjal (Best Presentator Award)"
@@ -404,7 +410,7 @@ uploaded_image_bytes = None
 if "Paste" in input_mode:
     vacancy_text = st.text_area(
         "Paste Job Vacancy / TOR text here:",
-        placeholder="Paste full job description, TOR, requirements, and responsibilities here...",
+        placeholder="Paste full job description, TOR, requirements, and application instructions here...",
         height=240
     )
 else:
@@ -416,26 +422,32 @@ else:
 has_input = (bool(vacancy_text.strip()) if "Paste" in input_mode else uploaded_image_bytes is not None)
 
 # -------------------------------------------------------------------------
-# STAGE 1: SCAN NOTICE
+# STAGE 1: SCAN NOTICE (Extracts Org, Positions, Email, & Requested Docs)
 # -------------------------------------------------------------------------
 if has_input and api_key:
     st.markdown("---")
     if st.button("🔍 Scan Notice", type="secondary"):
-        with st.spinner("Scanning notice for positions and organization..."):
+        with st.spinner("Scanning notice for positions, contact email, and requested documents..."):
             try:
                 client = Groq(api_key=api_key)
                 text_model, vision_model = get_groq_active_models(client)
 
                 scan_prompt = """
-                Scan this job announcement and extract:
+                Scan this job announcement carefully and extract:
                 1. The organization name.
                 2. All distinct individual job vacancies/positions available.
+                3. The exact application submission email address mentioned in the announcement (e.g. icdc.vacancy@gmail.com). If none found, return empty string.
+                4. The specific list of documents requested by the employer for submission.
+                   - If the announcement says something like "submit updated CV and a cover letter", return: ["Updated Curriculum Vitae (CV)", "Cover Letter"].
+                   - Only add other documents (like citizenship, academic transcripts, work certificates, PP photos) if the announcement explicitly requests them.
+
                 Return valid JSON only:
                 {
                     "organization": "Organization Name",
-                    "positions": ["Job Title 1", "Job Title 2"]
+                    "positions": ["Job Title 1", "Job Title 2"],
+                    "submission_email": "example@email.com",
+                    "requested_documents": ["Updated Curriculum Vitae (CV)", "Cover Letter"]
                 }
-                If only one position is mentioned, return a list with that single position.
                 """
 
                 if "Paste" in input_mode:
@@ -452,7 +464,7 @@ if has_input and api_key:
                         {
                             "role": "user",
                             "content": [
-                                {"type": "text", "text": "Extract organization and positions in JSON:"},
+                                {"type": "text", "text": "Extract organization, positions, application email, and requested documents in JSON:"},
                                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
                             ]
                         }
@@ -478,10 +490,13 @@ if has_input and api_key:
 if st.session_state.scanned_data:
     org_name = st.session_state.scanned_data.get("organization", "Organization")
     positions = st.session_state.scanned_data.get("positions", [])
+    sub_email = st.session_state.scanned_data.get("submission_email", "")
+    req_docs = st.session_state.scanned_data.get("requested_documents", ["Updated Curriculum Vitae (CV)", "Cover Letter"])
     total_vacancies = len(positions)
 
     st.markdown("---")
-    st.info(f"🏢 **Organization:** {org_name}  |  📋 **Total Vacancies Found:** {total_vacancies}")
+    email_display = f" | 📧 **Send To:** `{sub_email}`" if sub_email else ""
+    st.info(f"🏢 **Organization:** {org_name} | 📋 **Vacancies Found:** {total_vacancies}{email_display}")
 
     if total_vacancies > 1:
         chosen_pos = st.selectbox(
@@ -509,6 +524,7 @@ if st.session_state.scanned_data:
                     text_model, vision_model = get_groq_active_models(client)
 
                     today_formatted = datetime.today().strftime("%B %d, %Y")
+                    docs_json_str = json.dumps(req_docs)
 
                     full_prompt = f"""
                     You are a senior recruitment director and technical advisor for international and national NGOs in Nepal (UN agencies, FAO, WFP, USAID, FCDO, CARE, Save the Children, WWF, Plan International, Heifer).
@@ -517,9 +533,12 @@ if st.session_state.scanned_data:
                     Target Position: {target_role}
                     Organization: {org_name}
                     Today's Exact Date: {today_formatted}
+                    Application Destination Email: {sub_email}
+                    Specifically Requested Documents: {docs_json_str}
 
-                    CRITICAL CANDIDATE PROFILE & EVIDENCE BASE:
-                    - Degree: Bachelor of Science in Agriculture (B.Sc. Agriculture) from IAAS Tribhuvan University, Lamjung (Percentage: 78.3%, Merit Scholarship, Best Presentator Award). Ongoing Master of Science in Agriculture (M.Sc. Ag Horticulture, Agriculture and Forestry University AFU Chitwan, 2025-Present, thesis combining AI & manual data collection on tomato yield).
+                    STRICT CANDIDATE PROFILE & RULES:
+                    - Degree: Bachelor of Science in Agriculture (B.Sc. Agriculture) from IAAS Tribhuvan University, Lamjung (Merit Scholarship, Best Presentator Award). Ongoing Master of Science in Agriculture (M.Sc. Ag Horticulture, AFU Chitwan, 2025-Present, thesis combining AI & manual data collection on tomato yield).
+                    - ABSOLUTE RULE: DO NOT INCLUDE ANY PERCENTAGE OR '%' SYMBOL ANYWHERE IN EDUCATION, COVER LETTER, OR EMAIL. Do not write '78.3%' or 'Percentage'. Simply mention B.Sc. Agriculture with Merit Scholarship.
                     - Verified Track Record:
                       1. Stromme Foundation (Chitwan, Nov-Jan):
                          Trainer: Hands-on participatory agricultural training covering nursery and soil management, horticulture, mushroom cultivation, apiculture, sericulture, post-harvest handling, agricultural marketing, and rural enterprise development.
@@ -534,7 +553,7 @@ if st.session_state.scanned_data:
                       6. Technical Tools: Arc-GIS, RStudio, GenStat, SPSS, Python (Image Detection/Classification), MS Office.
 
                     ========================================================================
-                    SECTION A: IN-DEPTH, EVIDENCE-BASED COVER LETTER (~1 TO 1.2 PAGES)
+                    SECTION A: EVIDENCE-BASED COVER LETTER (~1 TO 1.2 PAGES)
                     ========================================================================
                     - Tone: Professional, confident, sincere, human, development-oriented, and practical.
                     - Evidence-Based: SHOW real field achievements (GEEP enterprise promotion in 5 rural municipalities, JICA focal point, Learn & Earn, NARC trials, National Agriculture Census).
@@ -552,24 +571,28 @@ if st.session_state.scanned_data:
                     SECTION B: INGO-TAILORED CV
                     ========================================================================
                     - Tagline: Strong scannable headline matching the vacancy.
-                    - Summary: 3-4 impactful lines answering who you are, sectors, stakeholders, and outcomes.
+                    - Summary: 3-4 impactful lines answering who you are, sectors, stakeholders, and outcomes. (Zero % mentions).
                     - Competencies: 8-12 prioritized competencies directly aligned to the JD.
                     - Tailored Experience: 4-5 substantive bullet points for each of the 5 authentic organizations.
 
                     ========================================================================
-                    SECTION C: ADMINISTRATIVE GMAIL APPLICATION MESSAGE
+                    SECTION C: ADMINISTRATIVE GMAIL APPLICATION MESSAGE & ATTACHMENTS
                     ========================================================================
                     - Formal, clear, and administrative email body.
                     - Clearly state position and vacancy source.
                     - 1-2 sentence suitability statement highlighting B.Sc. Ag (Horticulture/Enterprise experience) and ongoing M.Sc.
-                    - Checklist of attached documents (CV, Cover Letter, Transcripts, Nagarikta, Certificates).
+                    - ATTACHMENT CHECKLIST RULE:
+                      If the notice only asks for updated CV and cover letter, list ONLY:
+                      1. Updated Curriculum Vitae (CV)
+                      2. Cover Letter
+                      If other documents (citizenship, transcripts, certificates, PP photo) were specifically requested in the vacancy, enlist those exact items as well. Do not add unrequested items.
 
                     CRITICAL INSTRUCTION: You MUST fill all JSON fields completely. DO NOT leave cover_letter or email_body empty or abbreviated.
 
                     Return valid JSON only matching this schema:
                     {{
                         "cv_professional_tagline": "Horticulture & Livelihoods Specialist | Value Chain Development | Rural Enterprise | MEAL",
-                        "cv_professional_summary": "3-4 lines tailored professional summary...",
+                        "cv_professional_summary": "3-4 lines tailored professional summary without any percentage symbols...",
                         "cv_core_competencies": ["Competency 1", "Competency 2", "Competency 3", "Competency 4", "Competency 5", "Competency 6", "Competency 7", "Competency 8"],
                         "tailored_experience": [
                             {{
@@ -610,7 +633,7 @@ if st.session_state.scanned_data:
                         ],
                         "cover_letter": "{today_formatted}\\n\\nHiring Committee\\n{org_name}... (complete 5 substantive paragraphs)",
                         "email_subject": "Application for {target_role} - Sandesh Subedi",
-                        "email_body": "Formal Gmail body text with checklist and contact details..."
+                        "email_body": "Formal Gmail body text with correctly matched attachment checklist and contact details..."
                     }}
                     """
 
@@ -643,7 +666,7 @@ if st.session_state.scanned_data:
                     )
                     data = json.loads(resp.choices[0].message.content.strip())
 
-                    # Safe extraction for Cover Letter (guaranteed not blank)
+                    # Safe extraction for Cover Letter (guaranteed not blank & zero %)
                     cover_letter_val = ""
                     for k in ["cover_letter", "coverLetter", "letter", "application_letter", "cover_letter_body"]:
                         if data.get(k) and str(data[k]).strip():
@@ -653,14 +676,14 @@ if st.session_state.scanned_data:
                     if not cover_letter_val or len(cover_letter_val) < 80:
                         cover_letter_val = get_fallback_cover_letter(target_role, org_name, today_formatted)
 
-                    # Post-process Cover Letter Date
+                    # Clean date placeholders & sanitize %
                     raw_cl = clean_text(cover_letter_val)
                     raw_cl = re.sub(r'\[\s*Date\s*\]', today_formatted, raw_cl, flags=re.IGNORECASE)
                     if not raw_cl.startswith(today_formatted):
                         raw_cl = f"{today_formatted}\n\n" + raw_cl
                     data["cover_letter"] = raw_cl
 
-                    # Safe extraction for Email Subject & Body (guaranteed not blank)
+                    # Safe extraction for Email Subject & Body
                     email_body_val = ""
                     for k in ["email_body", "emailBody", "email", "email_text", "email_content", "body"]:
                         if data.get(k) and str(data[k]).strip():
@@ -668,7 +691,7 @@ if st.session_state.scanned_data:
                             break
 
                     if not email_body_val or len(email_body_val) < 40:
-                        email_body_val = get_fallback_email(target_role, org_name)
+                        email_body_val = get_fallback_email(target_role, org_name, req_docs)
                     data["email_body"] = clean_text(email_body_val)
 
                     email_sub_val = data.get("email_subject") or data.get("emailSubject") or f"Application for {target_role} - Sandesh Subedi"
@@ -730,7 +753,7 @@ if st.session_state.scanned_data:
                                 [clean_text(b) for b in raw_bullets]
                             )
 
-                    # 5. Education
+                    # 5. Education (No Percentage)
                     cv_pdf.draw_section_heading("Education")
                     for edu in PERMANENT_CV_SECTIONS["education"]:
                         cv_pdf.draw_two_col_entry(edu["inst"], edu["deg"], edu["loc"], edu["yr"])
@@ -838,6 +861,8 @@ if st.session_state.scanned_data:
 if st.session_state.generated_app_data is not None:
     data = st.session_state.generated_app_data
     current_target = st.session_state.selected_position
+    sub_email = st.session_state.scanned_data.get("submission_email", "") if st.session_state.scanned_data else ""
+    req_docs = st.session_state.scanned_data.get("requested_documents", ["Updated Curriculum Vitae (CV)", "Cover Letter"]) if st.session_state.scanned_data else ["Updated Curriculum Vitae (CV)", "Cover Letter"]
 
     st.markdown("---")
     st.success(f"Application ready for: **{current_target}**")
@@ -861,7 +886,7 @@ if st.session_state.generated_app_data is not None:
         for org in data.get("tailored_experience", []):
             with st.expander(f"📍 {clean_text(org.get('organization', ''))} - {clean_text(org.get('role', ''))}", expanded=True):
                 for b in org.get("bullets", []):
-                    # Web preview of work responsibilities displayed with Justified Alignment
+                    # Responsibilities displayed with Justified Alignment
                     st.markdown(f"<div style='text-align: justify; margin-bottom: 6px;'>• {clean_text(b)}</div>", unsafe_allow_html=True)
 
         # Download button placed at the end of the CV tab
@@ -891,9 +916,16 @@ if st.session_state.generated_app_data is not None:
 
     with tab_email:
         st.subheader("Email Template (Formal & Administrative)")
+
+        if sub_email:
+            st.text_input("Send To (Recipient):", value=sub_email, key="email_to_recipient")
+
         email_sub = clean_text(data.get("email_subject", f"Application for {current_target} - Sandesh Subedi"))
         st.text_input("Subject Line:", value=email_sub, key="email_sub_input")
 
         email_msg = clean_text(data.get("email_body", ""))
         st.text_area("Email Body:", value=email_msg, height=350, key="email_body_area")
-        st.caption("📎 Attach your CV (PDF), Cover Letter (PDF), Transcripts (B.Sc. Ag), and Nagarikta before sending.")
+
+        # Dynamic checklist caption reflecting only what was requested
+        docs_caption = ", ".join(req_docs)
+        st.caption(f"📎 **Requested Attachments:** {docs_caption}")
